@@ -1,0 +1,61 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.21
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=changeme
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - efk-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.21
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=changeme
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - efk-network
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/logs:/var/log/nginx
+    networks:
+      - efk-network
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:7.17.21
+    container_name: filebeat
+    user: root
+    command: filebeat -e -strict.perms=false
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ./nginx/logs:/var/log/nginx:ro
+    depends_on:
+      - elasticsearch
+      - kibana
+      - nginx
+    networks:
+      - efk-network
+
+volumes:
+  esdata:
+
+networks:
+  efk-network:
+    driver: bridge
